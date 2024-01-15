@@ -23,17 +23,43 @@ def nutzer_verwaltung():
 
 # Funktion zur Eingabe des Datums und der Uhrzeit im Stunden-Takt zwischen 7:00 und 17:00 Uhr
 def get_datetime_input(label):
-    start_time = datetime.strptime("07:00", "%H:%M")
-    end_time = datetime.strptime("17:00", "%H:%M")
+    current_time = datetime.now()
+
+    # Kalender für die Auswahl des Datums
+    selected_date = st.date_input(f"{label} Datum:", min_value=current_time, value=current_time)
+
+    # Überprüfung, ob der ausgewählte Tag ein Sonntag ist
+    if selected_date.weekday() == 6:  # Sonntag hat den Wochentags-Index 6
+        st.warning("Ruhetag - Sonntags sind keine Termine verfügbar, da die Hochschule geschlossen ist.")
+        return None
+
+    # Samstagsbedingung für Uhrzeiten zwischen 8:00 und 12:00 Uhr
+    is_saturday = selected_date.weekday() == 5  # Samstag hat den Wochentags-Index 5
+
+    if is_saturday:
+        start_time = datetime.combine(selected_date, datetime.strptime("08:00", "%H:%M").time())
+        end_time = datetime.combine(selected_date, datetime.strptime("12:00", "%H:%M").time())
+    else:
+        start_time = datetime.combine(selected_date, datetime.strptime("07:00", "%H:%M").time())
+        end_time = datetime.combine(selected_date, datetime.strptime("17:00", "%H:%M").time())
 
     # Liste aller möglichen Termine im vollen Stunden-Takt
     possible_times = [start_time + timedelta(hours=i) for i in range((end_time - start_time).seconds // 3600 + 1)]
+
+    if not possible_times:
+        st.warning("Es sind keine Termine für diesen Tag verfügbar.")
+        return None
 
     # Dropdown-Menü für die Auswahl der Uhrzeit
     selected_time = st.selectbox(f"{label} Uhrzeit:", possible_times, format_func=lambda x: x.strftime("%H:%M"))
 
     # Zusammenfügen von Datum und ausgewählter Uhrzeit
-    selected_datetime = datetime.combine(st.date_input(f"{label} Datum:"), selected_time.time())
+    selected_datetime = datetime.combine(selected_date, selected_time.time())
+
+    # Überprüfung, ob der ausgewählte Termin in der Zukunft liegt
+    if selected_datetime <= current_time:
+        st.error("Der ausgewählte Termin liegt in der Vergangenheit. Bitte wählen Sie einen Termin in der Zukunft.")
+        return None
 
     # Anzeige des ausgewählten Datums und der Uhrzeit
     st.write(f"Ausgewählter {label}: {selected_datetime.strftime('%Y-%m-%d %H:%M')}Uhr")
@@ -58,6 +84,22 @@ def geraet_verwaltung():
     else:  # Reservierungszeitraum auswählen
         geraet_reservierungsbedarf_start = st.date_input("Reservierungsbedarf Startdatum:")
         geraet_reservierungsbedarf_ende = st.date_input("Reservierungsbedarf Enddatum:")
+
+        # Überprüfung, ob der ausgewählte Reservierungszeitraum in der Zukunft liegt
+        current_time = datetime.now()
+        if geraet_reservierungsbedarf_start < current_time.date():
+            st.error("Der ausgewählte Reservierungszeitraum liegt in der Vergangenheit. Bitte wählen Sie einen Termin in der Zukunft.")
+            return
+
+        # Überprüfung, ob das Enddatum vor dem Startdatum liegt
+        if geraet_reservierungsbedarf_start > geraet_reservierungsbedarf_ende:
+            st.error("Das Enddatum darf nicht vor dem Startdatum liegen.")
+            return
+
+        # Überprüfung, ob der ausgewählte Start- oder Endtermin ein Sonntag ist
+        if geraet_reservierungsbedarf_start.weekday() == 6 or geraet_reservierungsbedarf_ende.weekday() == 6:
+            st.warning("Reservierung/ Rückgabe an Sonntagen nicht möglich, da Hochschule geschlossen.")
+            return
 
         # Anzeige des ausgewählten Reservierungszeitraums
         st.write(f"Ausgewählter Reservierungszeitraum: Von {geraet_reservierungsbedarf_start} bis {geraet_reservierungsbedarf_ende}")
